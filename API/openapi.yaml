@@ -1,0 +1,387 @@
+openapi: 3.1.0
+info:
+  title: Gemini File Search Store Navigator API
+  version: 1.0.0
+  description: >
+    HTTP surface over the IGeminiBackend abstraction. Lets clients list and manage
+    Gemini File Search stores, manage documents inside a store, and run RAG
+    queries. Auth is an OPT-IN static-header gate: when no secret is configured the
+    API runs open (local-run posture). When enabled, every data-plane request must
+    carry the X-Gemini-Nav-Auth header with an accepted value.
+
+servers:
+  - url: http://localhost:3000
+    description: Local run
+
+components:
+  securitySchemes:
+    StaticAuth:
+      type: apiKey
+      in: header
+      name: X-Gemini-Nav-Auth
+      description: >
+        Static perimeter header. Required only when the API was started with
+        GEMINI_NAV_API_AUTH_SECRET set. Omitted when auth is disabled.
+  parameters:
+    Profile:
+      name: X-Gemini-Nav-Profile
+      in: header
+      required: false
+      schema:
+        type: string
+      description: >
+        Selects the named Gemini credential profile. May also be supplied as the
+        `profile` query parameter. Falls back to the server's default profile.
+    PageSize:
+      name: pageSize
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+      description: Items per page (bounded by the server's max page size).
+    PageToken:
+      name: pageToken
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Opaque forward cursor returned as nextPageToken on the prior page.
+  responses:
+    Unauthorized:
+      description: Static-auth header missing or invalid
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflict (e.g. store-count limit reached)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PayloadTooLarge:
+      description: File exceeds the per-file size limit
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unprocessable:
+      description: Unsupported MIME type
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Rate / quota exceeded (Retry-After header may be present)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            correlationId:
+              type: string
+    StoreInfo:
+      type: object
+      properties:
+        apiName: { type: string }
+        displayName: { type: string }
+        createTime: { type: string }
+        updateTime: { type: string }
+        sizeBytes: { type: integer }
+        activeDocumentsCount: { type: integer }
+        pendingDocumentsCount: { type: integer }
+        failedDocumentsCount: { type: integer }
+        documentCount: { type: integer }
+        embeddingModel: { type: string }
+      required: [apiName]
+    DocumentInfo:
+      type: object
+      properties:
+        apiName: { type: string }
+        displayName: { type: string }
+        state: { type: string }
+        sizeBytes: { type: integer }
+        mimeType: { type: string }
+        createTime: { type: string }
+        updateTime: { type: string }
+      required: [apiName, state]
+    QuerySource:
+      type: object
+      properties:
+        title: { type: string }
+        excerpt: { type: string }
+        storeName: { type: string }
+        uri: { type: string }
+        pageNumber: { type: integer }
+        mediaId: { type: string }
+    CitationSpan:
+      type: object
+      properties:
+        startIndex: { type: integer }
+        endIndex: { type: integer }
+        text: { type: string }
+        chunkIndices:
+          type: array
+          items: { type: integer }
+        confidenceScores:
+          type: array
+          items: { type: number }
+      required: [chunkIndices]
+    QueryResult:
+      type: object
+      properties:
+        answer: { type: string }
+        sources:
+          type: array
+          items: { $ref: '#/components/schemas/QuerySource' }
+        citations:
+          type: array
+          items: { $ref: '#/components/schemas/CitationSpan' }
+        finishReason: { type: string }
+        raw: {}
+      required: [answer, sources, citations]
+    StorePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/StoreInfo' }
+        nextPageToken:
+          type: [string, 'null']
+      required: [items, nextPageToken]
+    DocumentPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DocumentInfo' }
+        nextPageToken:
+          type: [string, 'null']
+      required: [items, nextPageToken]
+
+security:
+  - StaticAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Liveness probe (no auth)
+      security: []
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+  /readyz:
+    get:
+      summary: Readiness probe (no auth)
+      security: []
+      responses:
+        '200':
+          description: Ready
+        '503':
+          description: Not ready
+  /openapi:
+    get:
+      summary: This OpenAPI document (no auth)
+      security: []
+      responses:
+        '200':
+          description: OpenAPI YAML
+          content:
+            application/yaml: {}
+  /stores:
+    get:
+      summary: List File Search stores
+      parameters:
+        - $ref: '#/components/parameters/Profile'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '200':
+          description: A page of stores
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StorePage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create a store
+      parameters:
+        - $ref: '#/components/parameters/Profile'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string }
+                embeddingModel: { type: string }
+              required: [displayName]
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StoreInfo' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /stores/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+        description: URL-encoded apiName or displayName of the store.
+      - $ref: '#/components/parameters/Profile'
+    get:
+      summary: Get one store's metadata
+      responses:
+        '200':
+          description: Store metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StoreInfo' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Delete a store
+      parameters:
+        - name: force
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        '204': { description: Deleted }
+  /stores/{name}/documents:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+      - $ref: '#/components/parameters/Profile'
+    get:
+      summary: List documents in a store
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '200':
+          description: A page of documents
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentPage' }
+    post:
+      summary: Upload a document (from a server-accessible file path)
+      parameters:
+        - name: waitActive
+          in: query
+          required: false
+          schema: { type: boolean }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filePath: { type: string }
+                displayName: { type: string }
+                mimeType: { type: string }
+                waitActive: { type: boolean }
+              required: [filePath]
+      responses:
+        '201':
+          description: Uploaded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentInfo' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /stores/{name}/documents/{doc}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+      - name: doc
+        in: path
+        required: true
+        schema: { type: string }
+        description: URL-encoded document apiName.
+      - $ref: '#/components/parameters/Profile'
+    get:
+      summary: Get one document's metadata
+      responses:
+        '200':
+          description: Document metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentInfo' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Delete a document
+      parameters:
+        - name: force
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        '204': { description: Deleted }
+  /stores/{name}/query:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+      - $ref: '#/components/parameters/Profile'
+      - name: raw
+        in: query
+        required: false
+        schema: { type: boolean }
+        description: When true, returns the raw groundingMetadata subtree.
+    post:
+      summary: Run a File Search / RAG query against the store(s)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt: { type: string }
+                model: { type: string }
+                metadataFilter: { type: string }
+                storeNames:
+                  type: array
+                  items: { type: string }
+              required: [prompt]
+      responses:
+        '200':
+          description: Query result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QueryResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }

@@ -1,0 +1,75 @@
+{
+  "name": "gemini-nav",
+  "version": "1.0.0",
+  "description": "Gemini File Search Store Navigator — CLI, HTTP API, and Electron desktop UI for managing Gemini File Search stores, documents, and RAG queries",
+  "type": "module",
+  "main": "dist/electron/main.mjs",
+  "bin": {
+    "gemini-nav": "bin/gemini-nav.mjs"
+  },
+  "scripts": {
+    "build": "tsc",
+    "cli": "npx tsx src/cli/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "build:electron-main": "esbuild src/electron/main.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/electron/main.mjs --packages=external --sourcemap",
+    "build:renderer": "tsc -p src/electron/tsconfig.renderer.json",
+    "build:electron": "npm run build && npm run build:electron-main && npm run build:renderer",
+    "typecheck:electron": "tsc --noEmit -p src/electron/tsconfig.electron.json",
+    "dev:electron": "tsx src/electron/dev.ts",
+    "dist:mac": "npm run build:electron && electron-builder --mac --arm64"
+  },
+  "keywords": [
+    "gemini",
+    "file-search",
+    "rag",
+    "navigator",
+    "cli"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@google/genai": "^2.9.0",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "dotenv": "^17.4.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  },
+  "build": {
+    "appId": "com.giorgosmarinos.gemini-nav",
+    "productName": "Gemini Nav",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "src/electron/public", "to": "public" },
+      { "from": "src/electron/preload.cjs", "to": "preload.cjs" }
+    ],
+    "mac": {
+      "target": [
+        { "target": "dir", "arch": ["arm64"] }
+      ],
+      "category": "public.app-category.developer-tools",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    }
+  }
+}

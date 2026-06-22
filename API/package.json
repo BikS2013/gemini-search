@@ -1,0 +1,42 @@
+{
+  "name": "gemini-nav-api",
+  "version": "1.0.0",
+  "description": "Gemini File Search Store Navigator HTTP API — Express 5 surface over the IGeminiBackend abstraction (static-header auth, opt-in)",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "gemini-nav-api": "dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "^2.9.0",
+    "express": "^5.2.1",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^14.0.1",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "@types/supertest": "^7.2.0",
+    "@types/swagger-ui-express": "^4.1.8",
+    "supertest": "^7.2.2",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}

@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+
+# TypeScript / build output
+dist/
+*.tsbuildinfo
+
+# Electron packaging output (electron-builder)
+release/
+
+# Electron dev launcher temp bundle (created by src/electron/launch.ts)
+.electron-main.mjs
+.electron-main.mjs.map
+
+# Emitted renderer artifacts (built by tsconfig.renderer.json / build:renderer)
+src/electron/public/app.js
+src/electron/public/app.js.map
+src/electron/ipc-contract.js
+src/electron/ipc-contract.js.map
+
+# Secrets / local config (real secrets live encrypted under ~/.tool-agents/gemini-nav/)
+.env
+.env.*
+!.env.example
+
+# Belt-and-suspenders: never commit copies of the encrypted credential store or the
+# live metadata registry, even if they get copied into the repo for inspection.
+credentials.json
+**/credentials.json
+registry.json
+**/registry.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Vendored reference mirror of a SEPARATE project (~17 MB, third-party code; kept
+# locally for reference only — NOT part of this project). Remove this line if you
+# intend to commit it (mind the upstream license/attribution).
+docs/reference/storage-navigator-ref/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage / test output
+coverage/
+.vitest/
+
+# Local tool state (Serena memories etc. — contain absolute machine paths)
+.serena/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

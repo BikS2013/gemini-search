@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      Strict Content-Security-Policy for the file:// renderer (research §Window
+      hardening). There are no HTTP response headers under file://, so the policy
+      is declared as a <meta> tag. No remote resources, no inline scripts, no
+      inline event handlers (events are wired in app.ts via addEventListener).
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none';"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gemini Nav</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1 class="app-title">Gemini Nav</h1>
+      <div class="profile-bar">
+        <label for="profile-select">Profile</label>
+        <select id="profile-select" aria-label="Active profile">
+          <option value="">— select a profile —</option>
+        </select>
+        <span id="profile-keymode" class="badge" aria-live="polite"></span>
+        <button id="profile-refresh" type="button" class="btn-secondary">
+          Reload profiles
+        </button>
+      </div>
+    </header>
+
+    <!-- Global, dismissible status/error banner. -->
+    <div id="status-banner" class="banner" role="status" aria-live="polite" hidden>
+      <span id="status-banner-text"></span>
+      <button id="status-banner-close" type="button" class="banner-close" aria-label="Dismiss">×</button>
+    </div>
+
+    <main class="layout">
+      <!-- ============================ STORES ============================ -->
+      <section class="panel" id="stores-panel" aria-labelledby="stores-heading">
+        <div class="panel-head">
+          <h2 id="stores-heading">Stores</h2>
+          <button id="stores-reload" type="button" class="btn-secondary">Reload</button>
+        </div>
+
+        <form id="store-create-form" class="inline-form">
+          <input
+            id="store-create-name"
+            type="text"
+            placeholder="Display name"
+            autocomplete="off"
+            required
+          />
+          <input
+            id="store-create-embedding"
+            type="text"
+            placeholder="Embedding model (optional)"
+            autocomplete="off"
+          />
+          <button type="submit" class="btn-primary">Create store</button>
+        </form>
+
+        <ul id="stores-list" class="item-list" aria-label="File Search stores"></ul>
+        <div class="pager">
+          <button id="stores-more" type="button" class="btn-secondary" hidden>
+            Load more
+          </button>
+        </div>
+      </section>
+
+      <!-- ===================== STORE DETAIL + DOCS ===================== -->
+      <section class="panel" id="store-detail-panel" aria-labelledby="store-detail-heading">
+        <div class="panel-head">
+          <h2 id="store-detail-heading">Store detail</h2>
+        </div>
+
+        <div id="store-detail" class="detail" aria-live="polite">
+          <p class="muted">Select a store to view its metadata and documents.</p>
+        </div>
+
+        <div id="docs-section" hidden>
+          <div class="panel-head">
+            <h3>Documents</h3>
+            <button id="docs-reload" type="button" class="btn-secondary">Reload</button>
+          </div>
+
+          <form id="doc-upload-form" class="stacked-form">
+            <label for="doc-upload-path">Upload a local file</label>
+            <input
+              id="doc-upload-path"
+              type="text"
+              placeholder="Absolute file path"
+              autocomplete="off"
+              required
+            />
+            <input
+              id="doc-upload-display"
+              type="text"
+              placeholder="Display name (optional)"
+              autocomplete="off"
+            />
+            <input
+              id="doc-upload-mime"
+              type="text"
+              placeholder="MIME type (optional)"
+              autocomplete="off"
+            />
+            <label class="checkbox">
+              <input id="doc-upload-wait" type="checkbox" />
+              Wait until STATE_ACTIVE before completing
+            </label>
+            <button type="submit" class="btn-primary">Upload</button>
+          </form>
+
+          <div id="upload-progress" class="progress" aria-live="polite" hidden></div>
+
+          <ul id="docs-list" class="item-list" aria-label="Documents in store"></ul>
+          <div class="pager">
+            <button id="docs-more" type="button" class="btn-secondary" hidden>
+              Load more
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ QUERY ============================ -->
+      <section class="panel" id="query-panel" aria-labelledby="query-heading">
+        <div class="panel-head">
+          <h2 id="query-heading">File Search query</h2>
+        </div>
+
+        <form id="query-form" class="stacked-form">
+          <label for="query-stores">Stores (select one or more)</label>
+          <select id="query-stores" multiple size="4" aria-label="Stores to query"></select>
+
+          <label for="query-prompt">Prompt</label>
+          <textarea id="query-prompt" rows="3" placeholder="Ask a question…" required></textarea>
+
+          <label for="query-model">Model override (optional)</label>
+          <input
+            id="query-model"
+            type="text"
+            placeholder="gemini-3.1-pro-preview (fallback gemini-2.5-pro)"
+            autocomplete="off"
+          />
+
+          <label for="query-filter">Metadata filter (optional)</label>
+          <input
+            id="query-filter"
+            type="text"
+            placeholder="e.g. category = &quot;docs&quot;"
+            autocomplete="off"
+          />
+
+          <button type="submit" class="btn-primary">Run query</button>
+        </form>
+
+        <div id="query-results" class="results" aria-live="polite"></div>
+      </section>
+
+      <!-- =========================== REGISTRY =========================== -->
+      <section class="panel" id="registry-panel" aria-labelledby="registry-heading">
+        <div class="panel-head">
+          <h2 id="registry-heading">Local registry</h2>
+          <div class="btn-row">
+            <button id="registry-reload" type="button" class="btn-secondary">List</button>
+            <button id="registry-refresh" type="button" class="btn-secondary">
+              Refresh (live)
+            </button>
+          </div>
+        </div>
+        <ul id="registry-list" class="item-list" aria-label="Cached registry entries"></ul>
+      </section>
+    </main>
+
+    <!-- ===================== CONFIRMATION DIALOG ===================== -->
+    <div id="confirm-overlay" class="overlay" hidden>
+      <div
+        class="dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
+        aria-describedby="confirm-message"
+      >
+        <h2 id="confirm-title">Confirm</h2>
+        <p id="confirm-message"></p>
+        <div class="dialog-actions">
+          <button id="confirm-cancel" type="button" class="btn-secondary">Cancel</button>
+          <button id="confirm-ok" type="button" class="btn-danger">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

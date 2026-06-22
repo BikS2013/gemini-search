@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "rootDir": "..",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": true,
+    "types": ["node"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "../src/core/**/*.ts",
+    "../src/config/config-error.ts",
+    "../src/config/profile-config.ts",
+    "../src/util/redact.ts"
+  ],
+  "exclude": ["node_modules", "dist", "test"]
+}
