@@ -38,42 +38,109 @@
     </div>
 
     <main class="layout">
-      <!-- ============================ STORES ============================ -->
-      <section class="panel" id="stores-panel" aria-labelledby="stores-heading">
-        <div class="panel-head">
-          <h2 id="stores-heading">Stores</h2>
-          <button id="stores-reload" type="button" class="btn-secondary">Reload</button>
+      <!-- ================= STORES + QUERY (tabbed pane) ================= -->
+      <section class="panel" id="left-pane" aria-label="Stores and File Search query">
+        <div class="tabs" role="tablist" aria-label="Stores and query">
+          <button
+            id="tab-stores"
+            type="button"
+            class="tab active"
+            role="tab"
+            aria-selected="true"
+            aria-controls="tabpanel-stores"
+          >
+            Stores
+          </button>
+          <button
+            id="tab-query"
+            type="button"
+            class="tab"
+            role="tab"
+            aria-selected="false"
+            aria-controls="tabpanel-query"
+          >
+            File Search query
+          </button>
         </div>
 
-        <form id="store-create-form" class="inline-form">
-          <input
-            id="store-create-name"
-            type="text"
-            placeholder="Display name"
-            autocomplete="off"
-            required
-          />
-          <input
-            id="store-create-embedding"
-            type="text"
-            placeholder="Embedding model (optional)"
-            autocomplete="off"
-          />
-          <button type="submit" class="btn-primary">Create store</button>
-        </form>
+        <!-- ---- Stores tab ---- -->
+        <div
+          id="tabpanel-stores"
+          class="tabpanel"
+          role="tabpanel"
+          aria-labelledby="tab-stores"
+        >
+          <div class="tab-toolbar">
+            <button id="stores-reload" type="button" class="btn-secondary">Reload</button>
+          </div>
 
-        <ul id="stores-list" class="item-list" aria-label="File Search stores"></ul>
-        <div class="pager">
-          <button id="stores-more" type="button" class="btn-secondary" hidden>
-            Load more
-          </button>
+          <form id="store-create-form" class="inline-form">
+            <input
+              id="store-create-name"
+              type="text"
+              placeholder="Display name"
+              autocomplete="off"
+              required
+            />
+            <input
+              id="store-create-embedding"
+              type="text"
+              placeholder="Embedding model (optional)"
+              autocomplete="off"
+            />
+            <button type="submit" class="btn-primary">Create store</button>
+          </form>
+
+          <ul id="stores-list" class="item-list" aria-label="File Search stores"></ul>
+          <div class="pager">
+            <button id="stores-more" type="button" class="btn-secondary" hidden>
+              Load more
+            </button>
+          </div>
+        </div>
+
+        <!-- ---- File Search query tab ---- -->
+        <div
+          id="tabpanel-query"
+          class="tabpanel"
+          role="tabpanel"
+          aria-labelledby="tab-query"
+          hidden
+        >
+          <form id="query-form" class="stacked-form">
+            <label for="query-stores">Stores (select one or more)</label>
+            <select id="query-stores" multiple size="4" aria-label="Stores to query"></select>
+
+            <label for="query-prompt">Prompt</label>
+            <textarea id="query-prompt" rows="3" placeholder="Ask a question…" required></textarea>
+
+            <label for="query-model">Model override (optional)</label>
+            <input
+              id="query-model"
+              type="text"
+              placeholder="gemini-3.1-pro-preview (fallback gemini-2.5-pro)"
+              autocomplete="off"
+            />
+
+            <label for="query-filter">Metadata filter (optional)</label>
+            <input
+              id="query-filter"
+              type="text"
+              placeholder="e.g. category = &quot;docs&quot;"
+              autocomplete="off"
+            />
+
+            <button type="submit" class="btn-primary">Run query</button>
+          </form>
+
+          <div id="query-results" class="results" aria-live="polite"></div>
         </div>
       </section>
 
       <!-- ===================== STORE DETAIL + DOCS ===================== -->
       <section class="panel" id="store-detail-panel" aria-labelledby="store-detail-heading">
         <div class="panel-head">
-          <h2 id="store-detail-heading">Store detail</h2>
+          <h2 id="store-detail-heading">Store documents</h2>
         </div>
 
         <div id="store-detail" class="detail" aria-live="polite">
@@ -86,33 +153,38 @@
             <button id="docs-reload" type="button" class="btn-secondary">Reload</button>
           </div>
 
-          <form id="doc-upload-form" class="stacked-form">
-            <label for="doc-upload-path">Upload a local file</label>
-            <input
-              id="doc-upload-path"
-              type="text"
-              placeholder="Absolute file path"
-              autocomplete="off"
-              required
-            />
-            <input
-              id="doc-upload-display"
-              type="text"
-              placeholder="Display name (optional)"
-              autocomplete="off"
-            />
-            <input
-              id="doc-upload-mime"
-              type="text"
-              placeholder="MIME type (optional)"
-              autocomplete="off"
-            />
-            <label class="checkbox">
-              <input id="doc-upload-wait" type="checkbox" />
-              Wait until STATE_ACTIVE before completing
-            </label>
-            <button type="submit" class="btn-primary">Upload</button>
-          </form>
+          <details id="doc-upload-details" class="collapsible">
+            <summary>Upload a local file</summary>
+            <form id="doc-upload-form" class="stacked-form">
+              <input
+                id="doc-upload-path"
+                type="text"
+                placeholder="Absolute file path"
+                autocomplete="off"
+                aria-label="Absolute file path"
+                required
+              />
+              <input
+                id="doc-upload-display"
+                type="text"
+                placeholder="Display name (optional)"
+                autocomplete="off"
+                aria-label="Display name (optional)"
+              />
+              <input
+                id="doc-upload-mime"
+                type="text"
+                placeholder="MIME type (optional)"
+                autocomplete="off"
+                aria-label="MIME type (optional)"
+              />
+              <label class="checkbox">
+                <input id="doc-upload-wait" type="checkbox" />
+                Wait until STATE_ACTIVE before completing
+              </label>
+              <button type="submit" class="btn-primary">Upload</button>
+            </form>
+          </details>
 
           <div id="upload-progress" class="progress" aria-live="polite" hidden></div>
 
@@ -123,41 +195,6 @@
             </button>
           </div>
         </div>
-      </section>
-
-      <!-- ============================ QUERY ============================ -->
-      <section class="panel" id="query-panel" aria-labelledby="query-heading">
-        <div class="panel-head">
-          <h2 id="query-heading">File Search query</h2>
-        </div>
-
-        <form id="query-form" class="stacked-form">
-          <label for="query-stores">Stores (select one or more)</label>
-          <select id="query-stores" multiple size="4" aria-label="Stores to query"></select>
-
-          <label for="query-prompt">Prompt</label>
-          <textarea id="query-prompt" rows="3" placeholder="Ask a question…" required></textarea>
-
-          <label for="query-model">Model override (optional)</label>
-          <input
-            id="query-model"
-            type="text"
-            placeholder="gemini-3.1-pro-preview (fallback gemini-2.5-pro)"
-            autocomplete="off"
-          />
-
-          <label for="query-filter">Metadata filter (optional)</label>
-          <input
-            id="query-filter"
-            type="text"
-            placeholder="e.g. category = &quot;docs&quot;"
-            autocomplete="off"
-          />
-
-          <button type="submit" class="btn-primary">Run query</button>
-        </form>
-
-        <div id="query-results" class="results" aria-live="polite"></div>
       </section>
 
       <!-- =========================== REGISTRY =========================== -->

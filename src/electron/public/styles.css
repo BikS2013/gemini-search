@@ -117,14 +117,33 @@ h3 {
 .layout {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "left docs"
+    "left registry";
   gap: var(--gap);
   padding: var(--gap) 20px 40px;
   align-items: start;
 }
 
+#left-pane {
+  grid-area: left;
+}
+
+#store-detail-panel {
+  grid-area: docs;
+}
+
+#registry-panel {
+  grid-area: registry;
+}
+
 @media (max-width: 980px) {
   .layout {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "left"
+      "docs"
+      "registry";
   }
 }
 
@@ -142,6 +161,43 @@ h3 {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* ----------------------------------------------------------------- tabs */
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 8px 14px;
+  margin-bottom: -1px; /* overlap the container's bottom border */
+}
+
+.tab:hover:not(.active) {
+  color: var(--text);
+}
+
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+/* Right-aligned control row for a tab that has no heading (e.g. Stores reload). */
+.tab-toolbar {
+  display: flex;
+  justify-content: flex-end;
   margin-bottom: 12px;
 }
 
@@ -200,6 +256,58 @@ select[multiple] {
 
 .checkbox input {
   width: auto;
+}
+
+/* --------------------------------------------------- collapsible section */
+
+.collapsible {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-alt);
+}
+
+.collapsible > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Replace the native disclosure triangle with our own themed marker. */
+.collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible > summary::before {
+  content: "▸";
+  display: inline-block;
+  font-size: 11px;
+  transition: transform 0.15s ease;
+}
+
+.collapsible[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.collapsible > summary:hover {
+  color: var(--text);
+}
+
+.collapsible[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+
+/* The wrapped form supplies its own outer margin via .stacked-form; neutralise
+   it inside the disclosure and give the body padding instead. */
+.collapsible > .stacked-form {
+  margin-bottom: 0;
+  padding: 12px;
 }
 
 /* -------------------------------------------------------------- buttons */
@@ -298,6 +406,46 @@ button:disabled {
 
 .pager {
   margin-top: 10px;
+}
+
+/* ------------------------------------- inline tile info (store + document) */
+
+.doc-info,
+.store-info {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.doc-info dl,
+.store-info dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.doc-info dt,
+.store-info dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.doc-info dd,
+.store-info dd {
+  margin: 0;
+  word-break: break-all;
+}
+
+/* Full-width subsection heading inside an info definition list (e.g. the
+   "Custom metadata" group in a document's Info panel). */
+.doc-info .meta-heading,
+.store-info .meta-heading {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 /* ------------------------------------------------------------- detail */

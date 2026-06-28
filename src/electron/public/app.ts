@@ -282,6 +282,19 @@ function fmtBytes(n?: number): string {
   return `${v.toFixed(1)} ${units[i]}`;
 }
 
+/**
+ * Render one custom-metadata entry's value. A Gemini document metadata field
+ * carries exactly one of stringValue / numericValue / stringListValue; this
+ * mirrors the CLI's `printDocument` formatting so all three surfaces agree.
+ */
+function fmtCustomMetadataValue(m: DocCustomMetadata): string {
+  if (m.stringValue !== undefined) return m.stringValue;
+  if (m.numericValue != null) return String(m.numericValue);
+  if (m.stringListValue && m.stringListValue.length > 0)
+    return m.stringListValue.join(', ');
+  return '—';
+}
+
 // ---------------------------------------------------------------------------
 // Status banner (errors + success).
 // ---------------------------------------------------------------------------
@@ -404,7 +417,7 @@ async function onSelectProfile(): Promise<void> {
   showOk(`Active profile: ${name}`);
   // Reset dependent views.
   state.selectedStore = undefined;
-  renderStoreDetail();
+  renderSelectedStore();
   await loadStores(true);
   await loadRegistry();
 }
@@ -461,13 +474,74 @@ function renderStoreRow(store: StoreSummary): HTMLLIElement {
   const actions = el('div', { class: 'item-actions' });
   const openBtn = el('button', { class: 'btn-secondary', text: 'Open' });
   openBtn.addEventListener('click', () => void openStore(store.apiName));
+  const infoBtn = el('button', { class: 'btn-secondary', text: 'Info' });
   const delBtn = el('button', { class: 'btn-danger', text: 'Delete' });
   delBtn.addEventListener('click', () => void deleteStore(store));
   actions.appendChild(openBtn);
+  actions.appendChild(infoBtn);
   actions.appendChild(delBtn);
   li.appendChild(actions);
 
+  // Inline store-metadata panel: rendered INSIDE the tile and toggled by the
+  // Info button, instead of in the right-side panel (which now hosts only the
+  // selected store's documents).
+  const infoPanel = el('div', { class: 'store-info' });
+  infoPanel.hidden = true;
+  li.appendChild(infoPanel);
+  infoBtn.addEventListener(
+    'click',
+    () => void toggleStoreInfo(store.apiName, infoBtn, infoPanel),
+  );
+
   return li;
+}
+
+/**
+ * Toggle the inline store-info panel inside a tile. On open it fetches the full
+ * store metadata (`stores:get`) and renders it as a definition list inside the
+ * tile; on close it hides and clears the panel. The Info button doubles as the
+ * toggle (Info ↔ Hide).
+ */
+async function toggleStoreInfo(
+  idOrName: string,
+  btn: HTMLButtonElement,
+  panel: HTMLElement,
+): Promise<void> {
+  if (!panel.hidden) {
+    panel.hidden = true;
+    clear(panel);
+    btn.textContent = 'Info';
+    return;
+  }
+  const req: StoreGetReq = { idOrName };
+  const store = await call<StoreSummary>('stores:get', req);
+  if (!store) return;
+  renderStoreInfoInto(panel, store);
+  panel.hidden = false;
+  btn.textContent = 'Hide';
+}
+
+/** Render a store's full metadata as a definition list into `panel`. */
+function renderStoreInfoInto(panel: HTMLElement, store: StoreSummary): void {
+  clear(panel);
+  const dl = el('dl');
+  const rows: Array<[string, string]> = [
+    ['Display name', store.displayName || '—'],
+    ['API name', store.apiName],
+    ['Embedding model', store.embeddingModel || '—'],
+    ['Documents', String(store.documentCount ?? 0)],
+    ['Active', String(store.activeDocumentsCount ?? 0)],
+    ['Pending', String(store.pendingDocumentsCount ?? 0)],
+    ['Failed', String(store.failedDocumentsCount ?? 0)],
+    ['Size', fmtBytes(store.sizeBytes)],
+    ['Created', store.createTime || '—'],
+    ['Updated', store.updateTime || '—'],
+  ];
+  for (const [k, v] of rows) {
+    dl.appendChild(el('dt', { text: k }));
+    dl.appendChild(el('dd', { text: v }));
+  }
+  panel.appendChild(dl);
 }
 
 async function onCreateStore(event: Event): Promise<void> {
@@ -511,7 +585,7 @@ async function deleteStore(store: StoreSummary): Promise<void> {
   showOk(`Deleted store: ${label}`);
   if (state.selectedStore?.apiName === store.apiName) {
     state.selectedStore = undefined;
-    renderStoreDetail();
+    renderSelectedStore();
   }
   await loadStores(true);
 }
@@ -521,7 +595,7 @@ async function openStore(apiName: string): Promise<void> {
   const store = await call<StoreSummary>('stores:get', req);
   if (!store) return;
   state.selectedStore = store;
-  renderStoreDetail();
+  renderSelectedStore();
   markSelectedStoreRow(apiName);
   await loadDocuments(true);
 }
@@ -533,7 +607,13 @@ function markSelectedStoreRow(apiName: string): void {
   }
 }
 
-function renderStoreDetail(): void {
+/**
+ * Render the right-side panel for the currently selected store. The full
+ * metadata now lives inline in each store tile's Info panel; here we render only
+ * a compact context header (so the documents below are clearly attributed to a
+ * store) and toggle the documents section.
+ */
+function renderSelectedStore(): void {
   const detail = $('store-detail');
   const docsSection = $('docs-section');
   clear(detail);
@@ -542,30 +622,19 @@ function renderStoreDetail(): void {
     detail.appendChild(
       el('p', {
         class: 'muted',
-        text: 'Select a store to view its metadata and documents.',
+        text: "Open a store to manage its documents. Use a store's Info button to view its metadata.",
       }),
     );
     docsSection.hidden = true;
     return;
   }
-  const dl = el('dl');
-  const rows: Array<[string, string]> = [
-    ['Display name', store.displayName || '—'],
-    ['API name', store.apiName],
-    ['Embedding model', store.embeddingModel || '—'],
-    ['Documents', String(store.documentCount ?? 0)],
-    ['Active', String(store.activeDocumentsCount ?? 0)],
-    ['Pending', String(store.pendingDocumentsCount ?? 0)],
-    ['Failed', String(store.failedDocumentsCount ?? 0)],
-    ['Size', fmtBytes(store.sizeBytes)],
-    ['Created', store.createTime || '—'],
-    ['Updated', store.updateTime || '—'],
-  ];
-  for (const [k, v] of rows) {
-    dl.appendChild(el('dt', { text: k }));
-    dl.appendChild(el('dd', { text: v }));
-  }
-  detail.appendChild(dl);
+  detail.appendChild(
+    el('div', {
+      class: 'item-title',
+      text: store.displayName || store.apiName,
+    }),
+  );
+  detail.appendChild(el('div', { class: 'item-meta', text: store.apiName }));
   docsSection.hidden = false;
 }
 
@@ -612,7 +681,6 @@ function renderDocRow(doc: DocSummary): HTMLLIElement {
 
   const actions = el('div', { class: 'item-actions' });
   const infoBtn = el('button', { class: 'btn-secondary', text: 'Info' });
-  infoBtn.addEventListener('click', () => void showDocInfo(doc.apiName));
   const replaceBtn = el('button', { class: 'btn-secondary', text: 'Replace' });
   replaceBtn.addEventListener('click', () => void replaceDocument(doc));
   const delBtn = el('button', { class: 'btn-danger', text: 'Delete' });
@@ -621,22 +689,82 @@ function renderDocRow(doc: DocSummary): HTMLLIElement {
   actions.appendChild(replaceBtn);
   actions.appendChild(delBtn);
   li.appendChild(actions);
+
+  // Inline info panel: rendered INSIDE the tile and toggled by the Info button,
+  // so the metadata stays anchored to its document instead of being pushed into
+  // the top status banner.
+  const infoPanel = el('div', { class: 'doc-info' });
+  infoPanel.hidden = true;
+  li.appendChild(infoPanel);
+  infoBtn.addEventListener(
+    'click',
+    () => void toggleDocInfo(doc.apiName, infoBtn, infoPanel),
+  );
+
   return li;
 }
 
-async function showDocInfo(documentApiName: string): Promise<void> {
+/**
+ * Toggle the inline document-info panel inside a tile. On open it fetches the
+ * full metadata (`docs:get`) and renders it as a definition list inside the
+ * tile; on close it hides and clears the panel. The Info button doubles as the
+ * toggle (Info ↔ Hide).
+ */
+async function toggleDocInfo(
+  documentApiName: string,
+  btn: HTMLButtonElement,
+  panel: HTMLElement,
+): Promise<void> {
+  if (!panel.hidden) {
+    panel.hidden = true;
+    clear(panel);
+    btn.textContent = 'Info';
+    return;
+  }
   const doc = await call<DocSummary>('docs:get', { documentApiName });
   if (!doc) return;
-  const lines = [
-    `Name: ${doc.displayName || doc.apiName}`,
-    `API name: ${doc.apiName}`,
-    `State: ${doc.state}`,
-    `MIME: ${doc.mimeType || '—'}`,
-    `Size: ${fmtBytes(doc.sizeBytes)}`,
-    `Created: ${doc.createTime || '—'}`,
-    `Updated: ${doc.updateTime || '—'}`,
+  renderDocInfoInto(panel, doc);
+  panel.hidden = false;
+  btn.textContent = 'Hide';
+}
+
+/** Render a document's full metadata as a definition list into `panel`. */
+function renderDocInfoInto(panel: HTMLElement, doc: DocSummary): void {
+  clear(panel);
+  const dl = el('dl');
+  const rows: Array<[string, string]> = [
+    ['Name', doc.displayName || doc.apiName],
+    ['API name', doc.apiName],
+    ['State', String(doc.state)],
+    ['MIME', doc.mimeType || '—'],
+    ['Size', fmtBytes(doc.sizeBytes)],
+    ['Created', doc.createTime || '—'],
+    ['Updated', doc.updateTime || '—'],
   ];
-  showOk(lines.join('  |  '));
+  for (const [k, v] of rows) {
+    dl.appendChild(el('dt', { text: k }));
+    dl.appendChild(el('dd', { text: v }));
+  }
+  // Custom metadata: present EVERY key/value pair attached to the document so the
+  // Info panel exposes all available metadata (parity with the CLI's doc-info).
+  // The heading spans both grid columns (see `.meta-heading` in styles.css).
+  const custom = doc.customMetadata ?? [];
+  if (custom.length > 0) {
+    dl.appendChild(
+      el('div', {
+        class: 'meta-heading',
+        text: `Custom metadata (${custom.length})`,
+      }),
+    );
+    for (const m of custom) {
+      dl.appendChild(el('dt', { text: m.key }));
+      dl.appendChild(el('dd', { text: fmtCustomMetadataValue(m) }));
+    }
+  } else {
+    dl.appendChild(el('dt', { text: 'Custom metadata' }));
+    dl.appendChild(el('dd', { text: '—' }));
+  }
+  panel.appendChild(dl);
 }
 
 let uploadCounter = 0;
@@ -981,10 +1109,39 @@ async function pruneRegistry(entry: RegistryEntryView): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Tabs (left pane: Stores | File Search query). Pure DOM toggling — both
+// tabpanels stay mounted (so the query store-select keeps syncing with the
+// store list); only visibility and ARIA state change.
+// ---------------------------------------------------------------------------
+
+const TABS: ReadonlyArray<{ tab: string; panel: string }> = [
+  { tab: 'tab-stores', panel: 'tabpanel-stores' },
+  { tab: 'tab-query', panel: 'tabpanel-query' },
+];
+
+function activateTab(tabId: string): void {
+  for (const { tab, panel } of TABS) {
+    const isActive = tab === tabId;
+    const tabEl = $(tab);
+    tabEl.classList.toggle('active', isActive);
+    tabEl.setAttribute('aria-selected', String(isActive));
+    $(panel).hidden = !isActive;
+  }
+}
+
+function wireTabs(): void {
+  for (const { tab } of TABS) {
+    $(tab).addEventListener('click', () => activateTab(tab));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Wiring (all events via addEventListener — CSP forbids inline handlers).
 // ---------------------------------------------------------------------------
 
 function wire(): void {
+  wireTabs();
+
   $('profile-select').addEventListener('change', () => void onSelectProfile());
   $('profile-refresh').addEventListener('click', () => void loadProfiles());
 
